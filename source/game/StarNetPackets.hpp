@@ -117,7 +117,15 @@ enum class PacketType : uint8_t {
 
   // OpenStarbound packets
   ReplaceTileList,
-  UpdateWorldTemplate
+  UpdateWorldTemplate,
+
+  // Space Combat packets (prototype feature)
+  SpaceCombatStart,           // Server -> Client: join combat arena
+  SpaceCombatStop,            // Server -> Client: leave combat arena
+  SpaceCombatShipUpdate,      // Server -> Client: ship state snapshots
+  SpaceCombatProjectileSpawn, // Server -> Client: new projectile
+  SpaceCombatProjectileHit,   // Server -> Client: projectile hit
+  SpaceCombatInput            // Client -> Server: pilot controls
 };
 extern EnumMap<PacketType> const PacketTypeNames;
 
@@ -980,5 +988,80 @@ struct UpdateWorldTemplatePacket : PacketBase<PacketType::UpdateWorldTemplate> {
   void write(DataStream& ds) const override;
 
   Json templateData;
+};
+
+// Space Combat Packets
+
+struct SpaceCombatStartPacket : PacketBase<PacketType::SpaceCombatStart> {
+  SpaceCombatStartPacket();
+  SpaceCombatStartPacket(Vec2F arenaSize, List<pair<Uuid, ByteArray>> initialShips);
+
+  void read(DataStream& ds) override;
+  void write(DataStream& ds) const override;
+
+  Vec2F arenaSize;
+  List<pair<Uuid, ByteArray>> initialShips; // uuid -> serialized ship state
+};
+
+struct SpaceCombatStopPacket : PacketBase<PacketType::SpaceCombatStop> {
+  SpaceCombatStopPacket();
+  SpaceCombatStopPacket(String reason);
+
+  void read(DataStream& ds) override;
+  void write(DataStream& ds) const override;
+
+  String reason;
+};
+
+struct SpaceCombatShipUpdatePacket : PacketBase<PacketType::SpaceCombatShipUpdate> {
+  SpaceCombatShipUpdatePacket();
+  SpaceCombatShipUpdatePacket(HashMap<Uuid, ByteArray> shipUpdates);
+
+  void read(DataStream& ds) override;
+  void write(DataStream& ds) const override;
+
+  HashMap<Uuid, ByteArray> shipUpdates; // uuid -> serialized ship state delta
+};
+
+struct SpaceCombatProjectileSpawnPacket : PacketBase<PacketType::SpaceCombatProjectileSpawn> {
+  SpaceCombatProjectileSpawnPacket();
+  SpaceCombatProjectileSpawnPacket(uint64_t projectileId, Uuid ownerShip, Vec2F position, Vec2F velocity, float damage);
+
+  void read(DataStream& ds) override;
+  void write(DataStream& ds) const override;
+
+  uint64_t projectileId;
+  Uuid ownerShip;
+  Vec2F position;
+  Vec2F velocity;
+  float damage;
+};
+
+struct SpaceCombatProjectileHitPacket : PacketBase<PacketType::SpaceCombatProjectileHit> {
+  SpaceCombatProjectileHitPacket();
+  SpaceCombatProjectileHitPacket(uint64_t projectileId, Uuid targetShip, Vec2F hitPosition, float damage);
+
+  void read(DataStream& ds) override;
+  void write(DataStream& ds) const override;
+
+  uint64_t projectileId;
+  Uuid targetShip;
+  Vec2F hitPosition;
+  float damage;
+};
+
+struct SpaceCombatInputPacket : PacketBase<PacketType::SpaceCombatInput> {
+  SpaceCombatInputPacket();
+  SpaceCombatInputPacket(bool thrustForward, bool thrustBackward, bool turnLeft, bool turnRight, bool fire, Vec2F aimDirection);
+
+  void read(DataStream& ds) override;
+  void write(DataStream& ds) const override;
+
+  bool thrustForward;
+  bool thrustBackward;
+  bool turnLeft;
+  bool turnRight;
+  bool fire;
+  Vec2F aimDirection;
 };
 }
