@@ -1,6 +1,5 @@
 #include "StarSpaceCombatTypes.hpp"
 #include "StarDataStream.hpp"
-#include "StarRoot.hpp"
 
 namespace Star {
 

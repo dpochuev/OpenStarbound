@@ -18,7 +18,7 @@ SpaceCombatWorld::SpaceCombatWorld(ClockConstPtr universeClock)
   
   if (m_enabled) {
     try {
-      auto combatConfig = root.assets()->json("/spacecombat.config");
+      auto combatConfig = root.assets()->json("/opensb/spacecombat.config");
       m_config = SpaceCombatConfig::fromJson(combatConfig);
       Logger::info("SpaceCombatWorld: Enabled with arena size {}x{}", 
                    m_config.arenaWidth, m_config.arenaHeight);
