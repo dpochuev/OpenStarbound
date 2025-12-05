@@ -4,6 +4,8 @@
 #include "StarLogging.hpp"
 #include "StarAssets.hpp"
 #include "StarTime.hpp"
+#include "StarWorldServer.hpp"
+#include "StarMaterialTypes.hpp"
 
 namespace Star {
 
@@ -39,7 +41,7 @@ bool SpaceCombatWorld::isEnabled() const {
   return m_enabled;
 }
 
-void SpaceCombatWorld::addShip(ConnectionId clientId, Uuid const& shipUuid, Vec2F initialPosition) {
+void SpaceCombatWorld::addShip(ConnectionId clientId, Uuid const& shipUuid, Vec2F initialPosition, WorldServerThreadPtr shipWorld) {
   if (!m_enabled)
     return;
     
@@ -54,11 +56,45 @@ void SpaceCombatWorld::addShip(ConnectionId clientId, Uuid const& shipUuid, Vec2
   ship.state.maxTurnRate = m_config.defaultTurnRate;
   ship.currentInput = SpaceCombatInput();
   ship.fireCooldown = 0.0f;
+  ship.shipWorld = shipWorld;
+  ship.cachedHitbox = RectF(-20.0f, -10.0f, 20.0f, 10.0f);  // Default hitbox
+  ship.cachedTileCount = 0;
   
   m_ships[clientId] = std::move(ship);
   
+  // If we have a ship world, calculate characteristics from tiles
+  if (shipWorld) {
+    if (auto characteristics = calculateShipCharacteristics(clientId)) {
+      auto& addedShip = m_ships[clientId];
+      addedShip.state.mass = characteristics->mass;
+      addedShip.state.maxThrust = characteristics->maxThrust;
+      addedShip.state.maxTurnRate = characteristics->maxTurnRate;
+      addedShip.cachedHitbox = characteristics->hitbox;
+      addedShip.cachedTileCount = characteristics->tileCount;
+    }
+  }
+  
   Logger::info("SpaceCombatWorld: Added ship for client {} at position {}", 
                clientId, initialPosition);
+}
+
+void SpaceCombatWorld::setShipWorld(ConnectionId clientId, WorldServerThreadPtr shipWorld) {
+  if (auto ship = m_ships.ptr(clientId)) {
+    ship->shipWorld = shipWorld;
+    
+    // Recalculate characteristics when ship world becomes available
+    if (shipWorld) {
+      if (auto characteristics = calculateShipCharacteristics(clientId)) {
+        ship->state.mass = characteristics->mass;
+        ship->state.maxThrust = characteristics->maxThrust;
+        ship->state.maxTurnRate = characteristics->maxTurnRate;
+        ship->cachedHitbox = characteristics->hitbox;
+        ship->cachedTileCount = characteristics->tileCount;
+        Logger::info("SpaceCombatWorld: Updated ship {} characteristics from {} tiles", 
+                     clientId, characteristics->tileCount);
+      }
+    }
+  }
 }
 
 void SpaceCombatWorld::removeShip(ConnectionId clientId) {
@@ -100,11 +136,11 @@ void SpaceCombatWorld::update(float dt) {
   // Update projectiles
   updateProjectiles(dt);
 
-  // Check for hits
-  auto hits = checkProjectileHits();
+  // Check for hits and apply tile damage
+  auto hits = checkProjectileHitsAndApplyDamage();
   for (auto const& hit : hits) {
-    // In full implementation, this would apply damage to the ship's tiles
-    Logger::debug("SpaceCombatWorld: Ship {} hit for {} damage", hit.first, hit.second);
+    Logger::debug("SpaceCombatWorld: Ship {} hit for {} damage at {}", 
+                  std::get<0>(hit), std::get<1>(hit), std::get<2>(hit));
   }
 
   // Queue state updates at tick rate
@@ -212,16 +248,56 @@ List<SpaceCombatProjectileState> const& SpaceCombatWorld::projectiles() const {
   return m_projectiles;
 }
 
-RectF SpaceCombatWorld::shipHitbox(SpaceCombatShipState const& state) const {
-  // Simplified hitbox - in full implementation would be calculated from ship structure
-  float halfWidth = 20.0f;
-  float halfHeight = 10.0f;
-  return RectF(state.position - Vec2F(halfWidth, halfHeight),
-               state.position + Vec2F(halfWidth, halfHeight));
+RectF SpaceCombatWorld::shipHitbox(CombatShip const& ship) const {
+  // Transform cached local hitbox to arena coordinates based on ship position
+  // Note: For simplicity, we ignore rotation in hitbox calculation for now
+  return RectF(
+    ship.state.position + ship.cachedHitbox.min(),
+    ship.state.position + ship.cachedHitbox.max()
+  );
 }
 
-List<pair<ConnectionId, float>> SpaceCombatWorld::checkProjectileHits() {
-  List<pair<ConnectionId, float>> hits;
+Vec2F SpaceCombatWorld::arenaToShipLocal(CombatShip const& ship, Vec2F arenaPos) const {
+  // Convert arena position to ship-local coordinates
+  Vec2F relativePos = arenaPos - ship.state.position;
+  
+  // Apply inverse rotation
+  float cosR = cos(-ship.state.rotation);
+  float sinR = sin(-ship.state.rotation);
+  return Vec2F(
+    relativePos[0] * cosR - relativePos[1] * sinR,
+    relativePos[0] * sinR + relativePos[1] * cosR
+  );
+}
+
+void SpaceCombatWorld::applyTileDamage(CombatShip& ship, Vec2F localHitPos, float damage) {
+  if (!ship.shipWorld)
+    return;
+
+  // Execute tile damage on the ship's WorldServer
+  ship.shipWorld->executeAction([localHitPos, damage](WorldServerThread*, WorldServer* worldServer) {
+    // Convert local hit position to tile coordinates
+    // Ship tiles are centered around the ship's origin
+    Vec2I tilePos = Vec2I::floor(localHitPos);
+    
+    // Create tile damage (using Explosive type for projectile hits)
+    TileDamage tileDamage(TileDamageType::Explosive, damage, 1);
+    
+    // Apply damage to foreground layer at hit position and surrounding tiles
+    List<Vec2I> damagePositions = {
+      tilePos,
+      tilePos + Vec2I(1, 0),
+      tilePos + Vec2I(-1, 0),
+      tilePos + Vec2I(0, 1),
+      tilePos + Vec2I(0, -1)
+    };
+    
+    worldServer->damageTiles(damagePositions, TileLayer::Foreground, Vec2F(localHitPos), tileDamage, {});
+  });
+}
+
+List<tuple<ConnectionId, float, Vec2F>> SpaceCombatWorld::checkProjectileHitsAndApplyDamage() {
+  List<tuple<ConnectionId, float, Vec2F>> hits;
   
   m_projectiles.filter([&](SpaceCombatProjectileState& proj) {
     for (auto& shipPair : m_ships) {
@@ -229,9 +305,15 @@ List<pair<ConnectionId, float>> SpaceCombatWorld::checkProjectileHits() {
       if (shipPair.second.shipUuid == proj.ownerShipUuid)
         continue;
         
-      RectF hitbox = shipHitbox(shipPair.second.state);
+      RectF hitbox = shipHitbox(shipPair.second);
       if (hitbox.contains(proj.position)) {
-        hits.append({shipPair.first, proj.damage});
+        // Calculate local hit position for tile damage
+        Vec2F localHitPos = arenaToShipLocal(shipPair.second, proj.position);
+        
+        // Apply tile damage to the ship
+        applyTileDamage(shipPair.second, localHitPos, proj.damage);
+        
+        hits.append({shipPair.first, proj.damage, proj.position});
         return false;  // Remove projectile
       }
     }
@@ -239,6 +321,66 @@ List<pair<ConnectionId, float>> SpaceCombatWorld::checkProjectileHits() {
   });
   
   return hits;
+}
+
+Maybe<SpaceCombatWorld::ShipCharacteristics> SpaceCombatWorld::calculateShipCharacteristics(ConnectionId clientId) {
+  auto ship = m_ships.ptr(clientId);
+  if (!ship || !ship->shipWorld)
+    return {};
+
+  ShipCharacteristics characteristics;
+  
+  // Execute on the ship's WorldServer to read tile data
+  ship->shipWorld->executeAction([&characteristics](WorldServerThread*, WorldServer* worldServer) {
+    // Get the world geometry to scan for tiles
+    // For ships, we need to scan a reasonable area around the origin
+    // Ships typically have a central structure
+    
+    int tileCount = 0;
+    float minX = 0, maxX = 0, minY = 0, maxY = 0;
+    bool foundAnyTile = false;
+    
+    // Scan a reasonable area for ship tiles (ships are usually within +/- 100 tiles of center)
+    int scanRadius = 100;
+    for (int x = -scanRadius; x <= scanRadius; ++x) {
+      for (int y = -scanRadius; y <= scanRadius; ++y) {
+        Vec2I pos(x, y);
+        // Check if there's a foreground tile at this position
+        auto tile = worldServer->getServerTile(pos);
+        if (tile.foreground != EmptyMaterialId) {
+          tileCount++;
+          if (!foundAnyTile) {
+            minX = maxX = x;
+            minY = maxY = y;
+            foundAnyTile = true;
+          } else {
+            minX = std::min(minX, (float)x);
+            maxX = std::max(maxX, (float)x);
+            minY = std::min(minY, (float)y);
+            maxY = std::max(maxY, (float)y);
+          }
+        }
+      }
+    }
+    
+    characteristics.tileCount = tileCount;
+    
+    if (foundAnyTile) {
+      // Hitbox with some padding
+      characteristics.hitbox = RectF(minX - 1, minY - 1, maxX + 2, maxY + 2);
+      
+      // Mass based on tile count (each tile adds some mass)
+      characteristics.mass = std::max(50.0f, tileCount * 2.0f);
+      
+      // Thrust and turn rate - could be based on specific "engine" blocks
+      // For now, base it on ship size (larger ships are slower but more powerful)
+      float sizeFactor = std::sqrt((float)tileCount);
+      characteristics.maxThrust = 300.0f + sizeFactor * 20.0f;
+      characteristics.maxTurnRate = std::max(0.5f, 3.0f - sizeFactor * 0.02f);
+    }
+  });
+  
+  return characteristics;
 }
 
 void SpaceCombatWorld::queueStateUpdates() {
