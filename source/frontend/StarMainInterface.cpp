@@ -58,6 +58,9 @@
 #include "StarQuestTracker.hpp"
 #include "StarContainerInteractor.hpp"
 #include "StarChatBubbleManager.hpp"
+#include "StarSpaceCombatClient.hpp"
+#include "StarNetPackets.hpp"
+#include "StarInput.hpp"
 #include "StarNpc.hpp"
 #include "StarCharSelection.hpp"
 
@@ -560,6 +563,9 @@ void MainInterface::update(float dt) {
   } else {
     m_paneManager.dismissRegisteredPane(MainInterfacePanes::WireInterface);
   }
+
+  // Update space combat input when in combat mode
+  updateSpaceCombatInput();
 
   // update inventory pane items, to know if item slots changed
   m_inventoryWindow->updateItems();
@@ -1672,6 +1678,53 @@ void MainInterface::displayScriptPane(ScriptPanePtr& scriptPane, EntityId source
   } else {
     m_paneManager.displayPane(layer, scriptPane);
   }
+}
+
+void MainInterface::updateSpaceCombatInput() {
+  // Check if we're in space combat mode
+  if (!m_client->inSpaceCombat())
+    return;
+
+  auto player = m_client->mainPlayer();
+  if (!player || !player->inWorld())
+    return;
+
+  // Check if player is lounging (in a pilot seat)
+  auto loungeState = player->loungingIn();
+  if (!loungeState)
+    return;
+
+  // Gather input state from the Input system
+  auto& input = Input::singleton();
+  
+  // Build the combat input packet
+  SpaceCombatInput combatInput;
+  
+  // Map movement keys to ship controls
+  // W/Up = forward thrust, S/Down = backward thrust
+  // A/Left = turn left, D/Right = turn right
+  combatInput.thrustForward = input.bindHeld("player", "up");
+  combatInput.thrustBackward = input.bindHeld("player", "down");
+  combatInput.turnLeft = input.bindHeld("player", "left");
+  combatInput.turnRight = input.bindHeld("player", "right");
+  
+  // Fire on primary mouse button or primary fire key
+  combatInput.fire = input.bindHeld("player", "primaryFire");
+  
+  // Aim direction based on cursor position relative to player
+  Vec2F playerPos = player->position();
+  Vec2F cursorPos = cursorWorldPosition();
+  Vec2F aimDir = cursorPos - playerPos;
+  if (aimDir.magnitude() > 0.0001f)
+    combatInput.aimDirection = aimDir.normalized();
+  else
+    combatInput.aimDirection = Vec2F(1.0f, 0.0f);
+
+  // Update local client state
+  m_client->spaceCombatClient()->setLocalInput(combatInput);
+
+  // Send input packet to server
+  m_client->sendSpaceCombatInput(combatInput);
 }
 
 }

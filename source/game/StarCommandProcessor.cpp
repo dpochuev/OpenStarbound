@@ -21,6 +21,7 @@
 #include "StarAssets.hpp"
 #include "StarWorldLuaBindings.hpp"
 #include "StarUniverseServerLuaBindings.hpp"
+#include "StarSpaceCombatWorld.hpp"
 
 namespace Star {
 
@@ -941,6 +942,39 @@ String CommandProcessor::setEnvironmentBiome(ConnectionId connectionId, String c
   return done ? "set environment biome for world layer" : "failed to set environment biome";
 }
 
+String CommandProcessor::spaceCombat(ConnectionId connectionId, String const& argumentString) {
+  // Check if space combat is enabled
+  auto config = Root::singleton().configuration();
+  if (!config->get("spaceCombatEnabled", false).toBool()) {
+    return "Space combat is not enabled on this server. Set spaceCombatEnabled: true in configuration.";
+  }
+
+  auto arguments = m_parser.tokenizeToStringList(argumentString);
+  
+  if (arguments.empty() || arguments[0] == "help") {
+    return "Usage: /spacecombat [join|leave|status]\n"
+           "  join  - Enter space combat arena\n"
+           "  leave - Leave space combat arena\n"
+           "  status - Show current combat status";
+  }
+
+  String subCommand = arguments[0].toLower();
+  
+  if (subCommand == "join") {
+    // For now, just log that player wants to join
+    // Full implementation would involve UniverseServer integration
+    Logger::info("Player {} requesting to join space combat", m_universe->clientNick(connectionId));
+    return "Space combat join request sent. (Prototype: full integration pending)";
+  } else if (subCommand == "leave") {
+    Logger::info("Player {} requesting to leave space combat", m_universe->clientNick(connectionId));
+    return "Space combat leave request sent. (Prototype: full integration pending)";
+  } else if (subCommand == "status") {
+    return "Space combat status: Not in combat. (Prototype)";
+  } else {
+    return strf("Unknown subcommand '{}'. Use /spacecombat help for usage.", subCommand);
+  }
+}
+
 Maybe<ConnectionId> CommandProcessor::playerCidFromCommand(String const& player, UniverseServer* universe) {
   char const* const UsernamePrefix = "@";
   char const* const CidPrefix = "$";
@@ -1047,6 +1081,8 @@ String CommandProcessor::handleCommand(ConnectionId connectionId, String const& 
     return setWeather(connectionId, argumentString);
   } else if (command == "setenvironmentbiome") {
     return setEnvironmentBiome(connectionId, argumentString);
+  } else if (command == "spacecombat") {
+    return spaceCombat(connectionId, argumentString);
   } else if (auto res = m_scriptComponent.invoke("command", command, connectionId, jsonFromStringList(m_parser.tokenizeToStringList(argumentString)))) {
     return toString(*res);
   } else {

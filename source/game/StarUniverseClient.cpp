@@ -15,6 +15,8 @@
 #include "StarTcp.hpp"
 #include "StarWorldClient.hpp"
 #include "StarSystemWorldClient.hpp"
+#include "StarSpaceCombatClient.hpp"
+#include "StarSpaceCombatTypes.hpp"
 #include "StarClientContext.hpp"
 #include "StarTeamClient.hpp"
 #include "StarSha256.hpp"
@@ -32,6 +34,7 @@ UniverseClient::UniverseClient(PlayerStoragePtr playerStorage, StatisticsPtr sta
   m_statistics = std::move(statistics);
   m_pause = false;
   m_luaRoot = make_shared<LuaRoot>();
+  m_spaceCombatClient = make_shared<SpaceCombatClient>();
   reset();
 }
 
@@ -696,8 +699,35 @@ StatisticsPtr UniverseClient::statistics() const {
   return m_statistics;
 }
 
+SpaceCombatClientPtr UniverseClient::spaceCombatClient() const {
+  return m_spaceCombatClient;
+}
+
+bool UniverseClient::inSpaceCombat() const {
+  return m_spaceCombatClient && m_spaceCombatClient->inCombat();
+}
+
 bool UniverseClient::paused() const {
   return m_pause;
+}
+
+void UniverseClient::sendSpaceCombatInput(SpaceCombatInput const& input) {
+  if (!m_connection || !m_connection->isOpen())
+    return;
+  
+  if (!inSpaceCombat())
+    return;
+
+  auto packet = make_shared<SpaceCombatInputPacket>(
+    input.thrustForward,
+    input.thrustBackward,
+    input.turnLeft,
+    input.turnRight,
+    input.fire,
+    input.aimDirection
+  );
+  
+  m_connection->pushSingle(packet);
 }
 
 void UniverseClient::setPause(bool pause) {
@@ -778,6 +808,36 @@ void UniverseClient::handlePackets(List<PacketPtr> const& packets) {
         GlobalTimescale = clamp(pausePacket->timescale, 0.0f, 1024.f);
       } else if (auto serverInfoPacket = as<ServerInfoPacket>(packet)) {
         m_serverInfo = ServerInfo{serverInfoPacket->players, serverInfoPacket->maxPlayers};
+      
+      // Space Combat packets
+      } else if (auto spaceCombatStart = as<SpaceCombatStartPacket>(packet)) {
+        m_spaceCombatClient->enterCombat(spaceCombatStart->arenaSize, spaceCombatStart->initialShips);
+      } else if (auto spaceCombatStop = as<SpaceCombatStopPacket>(packet)) {
+        m_spaceCombatClient->leaveCombat();
+        Logger::info("UniverseClient: Left space combat: {}", spaceCombatStop->reason);
+      } else if (auto spaceCombatShipUpdate = as<SpaceCombatShipUpdatePacket>(packet)) {
+        for (auto const& update : spaceCombatShipUpdate->shipUpdates) {
+          DataStreamBuffer ds(update.second);
+          SpaceCombatShipState state;
+          ds >> state;
+          m_spaceCombatClient->updateShipState(update.first, state);
+        }
+      } else if (auto spaceCombatProjectileSpawn = as<SpaceCombatProjectileSpawnPacket>(packet)) {
+        SpaceCombatProjectileState proj;
+        proj.id = spaceCombatProjectileSpawn->projectileId;
+        proj.ownerShipUuid = spaceCombatProjectileSpawn->ownerShip;
+        proj.position = spaceCombatProjectileSpawn->position;
+        proj.velocity = spaceCombatProjectileSpawn->velocity;
+        proj.damage = spaceCombatProjectileSpawn->damage;
+        proj.timeToLive = 5.0f;
+        m_spaceCombatClient->spawnProjectile(proj);
+      } else if (auto spaceCombatProjectileHit = as<SpaceCombatProjectileHitPacket>(packet)) {
+        m_spaceCombatClient->removeProjectile(spaceCombatProjectileHit->projectileId);
+        // Future: Add visual/audio feedback for projectile hit (particles, sound)
+        Logger::debug("SpaceCombat: Projectile {} hit ship at {}", 
+                      spaceCombatProjectileHit->projectileId, 
+                      spaceCombatProjectileHit->hitPosition);
+      
       } else if (!m_systemWorldClient->handleIncomingPacket(packet)) {
         // see if the system world will handle it, otherwise pass it along to the world client
         m_worldClient->handleIncomingPackets({packet});

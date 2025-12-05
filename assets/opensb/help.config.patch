@@ -6,7 +6,8 @@
   "openSbDebugHelpText": "OpenSB Debug commands are: {}",
 
   "openSbDebugCommands": {
-    "run": "Usage /run <lua>. Executes a script on the player and outputs the return value to chat."
+    "run": "Usage /run <lua>. Executes a script on the player and outputs the return value to chat.",
+    "spacecombat": "Usage /spacecombat [join|leave|status]. Enter or leave space combat arena (prototype feature)."
   },
 
   "openSbCommands": {

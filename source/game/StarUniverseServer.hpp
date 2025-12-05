@@ -23,6 +23,7 @@ STAR_CLASS(UniverseServer);
 STAR_CLASS(WorldTemplate);
 STAR_CLASS(WorldServer);
 STAR_CLASS(UniverseSettings);
+STAR_CLASS(SpaceCombatWorld);
 
 STAR_EXCEPTION(UniverseServerException, StarException);
 
@@ -269,6 +270,9 @@ private:
   typedef LuaUpdatableComponent<LuaBaseComponent> ScriptComponent;
   typedef shared_ptr<ScriptComponent> ScriptComponentPtr;
   StringMap<ScriptComponentPtr> m_scriptContexts;
+
+  // Space Combat (prototype feature)
+  SpaceCombatWorldPtr m_spaceCombatWorld;
 };
 
 }

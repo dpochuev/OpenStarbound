@@ -10,6 +10,7 @@
 #include "StarSky.hpp"
 #include "StarUniverseConnection.hpp"
 #include "StarLuaComponents.hpp"
+#include "StarSpaceCombatTypes.hpp"
 
 namespace Star {
 
@@ -19,6 +20,7 @@ STAR_CLASS(Sky);
 STAR_STRUCT(Packet);
 STAR_CLASS(WorldClient);
 STAR_CLASS(SystemWorldClient);
+STAR_CLASS(SpaceCombatClient);
 STAR_CLASS(Player);
 STAR_CLASS(PlayerStorage);
 STAR_CLASS(Statistics);
@@ -111,6 +113,11 @@ public:
   PlayerStoragePtr playerStorage() const;
   StatisticsPtr statistics() const;
 
+  // Space Combat
+  SpaceCombatClientPtr spaceCombatClient() const;
+  bool inSpaceCombat() const;
+  void sendSpaceCombatInput(SpaceCombatInput const& input);
+
   bool paused() const;
 
 private:
@@ -132,6 +139,7 @@ private:
   ClockPtr m_universeClock;
   WorldClientPtr m_worldClient;
   SystemWorldClientPtr m_systemWorldClient;
+  SpaceCombatClientPtr m_spaceCombatClient;
   Maybe<UniverseConnection> m_connection;
   Maybe<ServerInfo> m_serverInfo;
 

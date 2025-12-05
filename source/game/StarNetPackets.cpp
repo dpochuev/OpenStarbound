@@ -78,7 +78,14 @@ EnumMap<PacketType> const PacketTypeNames{
   {PacketType::SystemObjectSpawn, "SystemObjectSpawn"},
   // OpenStarbound packets
   {PacketType::ReplaceTileList, "ReplaceTileList"},
-  {PacketType::UpdateWorldTemplate, "UpdateWorldTemplate"}
+  {PacketType::UpdateWorldTemplate, "UpdateWorldTemplate"},
+  // Space Combat packets
+  {PacketType::SpaceCombatStart, "SpaceCombatStart"},
+  {PacketType::SpaceCombatStop, "SpaceCombatStop"},
+  {PacketType::SpaceCombatShipUpdate, "SpaceCombatShipUpdate"},
+  {PacketType::SpaceCombatProjectileSpawn, "SpaceCombatProjectileSpawn"},
+  {PacketType::SpaceCombatProjectileHit, "SpaceCombatProjectileHit"},
+  {PacketType::SpaceCombatInput, "SpaceCombatInput"}
 };
 
 EnumMap<NetCompressionMode> const NetCompressionModeNames {
@@ -172,6 +179,13 @@ PacketPtr createPacket(PacketType type) {
     // OpenStarbound
     case PacketType::ReplaceTileList: return make_shared<ReplaceTileListPacket>();
     case PacketType::UpdateWorldTemplate: return make_shared<UpdateWorldTemplatePacket>();
+    // Space Combat
+    case PacketType::SpaceCombatStart: return make_shared<SpaceCombatStartPacket>();
+    case PacketType::SpaceCombatStop: return make_shared<SpaceCombatStopPacket>();
+    case PacketType::SpaceCombatShipUpdate: return make_shared<SpaceCombatShipUpdatePacket>();
+    case PacketType::SpaceCombatProjectileSpawn: return make_shared<SpaceCombatProjectileSpawnPacket>();
+    case PacketType::SpaceCombatProjectileHit: return make_shared<SpaceCombatProjectileHitPacket>();
+    case PacketType::SpaceCombatInput: return make_shared<SpaceCombatInputPacket>();
     default:
       throw StarPacketException(strf("Unrecognized packet type {}", (unsigned int)type));
   }
@@ -1443,6 +1457,119 @@ void UpdateWorldTemplatePacket::read(DataStream& ds) {
 
 void UpdateWorldTemplatePacket::write(DataStream& ds) const {
   ds.write(templateData);
+}
+
+// Space Combat Packets
+
+SpaceCombatStartPacket::SpaceCombatStartPacket() {}
+
+SpaceCombatStartPacket::SpaceCombatStartPacket(Vec2F arenaSize, List<pair<Uuid, ByteArray>> initialShips)
+  : arenaSize(arenaSize), initialShips(std::move(initialShips)) {}
+
+void SpaceCombatStartPacket::read(DataStream& ds) {
+  ds.read(arenaSize);
+  ds.read(initialShips);
+}
+
+void SpaceCombatStartPacket::write(DataStream& ds) const {
+  ds.write(arenaSize);
+  ds.write(initialShips);
+}
+
+SpaceCombatStopPacket::SpaceCombatStopPacket() {}
+
+SpaceCombatStopPacket::SpaceCombatStopPacket(String reason)
+  : reason(std::move(reason)) {}
+
+void SpaceCombatStopPacket::read(DataStream& ds) {
+  ds.read(reason);
+}
+
+void SpaceCombatStopPacket::write(DataStream& ds) const {
+  ds.write(reason);
+}
+
+SpaceCombatShipUpdatePacket::SpaceCombatShipUpdatePacket() {}
+
+SpaceCombatShipUpdatePacket::SpaceCombatShipUpdatePacket(HashMap<Uuid, ByteArray> shipUpdates)
+  : shipUpdates(std::move(shipUpdates)) {}
+
+void SpaceCombatShipUpdatePacket::read(DataStream& ds) {
+  ds.read(shipUpdates);
+}
+
+void SpaceCombatShipUpdatePacket::write(DataStream& ds) const {
+  ds.write(shipUpdates);
+}
+
+SpaceCombatProjectileSpawnPacket::SpaceCombatProjectileSpawnPacket()
+  : projectileId(0), damage(0.0f) {}
+
+SpaceCombatProjectileSpawnPacket::SpaceCombatProjectileSpawnPacket(
+    uint64_t projectileId, Uuid ownerShip, Vec2F position, Vec2F velocity, float damage)
+  : projectileId(projectileId), ownerShip(ownerShip), position(position), velocity(velocity), damage(damage) {}
+
+void SpaceCombatProjectileSpawnPacket::read(DataStream& ds) {
+  ds.read(projectileId);
+  ds.read(ownerShip);
+  ds.read(position);
+  ds.read(velocity);
+  ds.read(damage);
+}
+
+void SpaceCombatProjectileSpawnPacket::write(DataStream& ds) const {
+  ds.write(projectileId);
+  ds.write(ownerShip);
+  ds.write(position);
+  ds.write(velocity);
+  ds.write(damage);
+}
+
+SpaceCombatProjectileHitPacket::SpaceCombatProjectileHitPacket()
+  : projectileId(0), damage(0.0f) {}
+
+SpaceCombatProjectileHitPacket::SpaceCombatProjectileHitPacket(
+    uint64_t projectileId, Uuid targetShip, Vec2F hitPosition, float damage)
+  : projectileId(projectileId), targetShip(targetShip), hitPosition(hitPosition), damage(damage) {}
+
+void SpaceCombatProjectileHitPacket::read(DataStream& ds) {
+  ds.read(projectileId);
+  ds.read(targetShip);
+  ds.read(hitPosition);
+  ds.read(damage);
+}
+
+void SpaceCombatProjectileHitPacket::write(DataStream& ds) const {
+  ds.write(projectileId);
+  ds.write(targetShip);
+  ds.write(hitPosition);
+  ds.write(damage);
+}
+
+SpaceCombatInputPacket::SpaceCombatInputPacket()
+  : thrustForward(false), thrustBackward(false), turnLeft(false), turnRight(false), fire(false) {}
+
+SpaceCombatInputPacket::SpaceCombatInputPacket(
+    bool thrustForward, bool thrustBackward, bool turnLeft, bool turnRight, bool fire, Vec2F aimDirection)
+  : thrustForward(thrustForward), thrustBackward(thrustBackward), turnLeft(turnLeft),
+    turnRight(turnRight), fire(fire), aimDirection(aimDirection) {}
+
+void SpaceCombatInputPacket::read(DataStream& ds) {
+  ds.read(thrustForward);
+  ds.read(thrustBackward);
+  ds.read(turnLeft);
+  ds.read(turnRight);
+  ds.read(fire);
+  ds.read(aimDirection);
+}
+
+void SpaceCombatInputPacket::write(DataStream& ds) const {
+  ds.write(thrustForward);
+  ds.write(thrustBackward);
+  ds.write(turnLeft);
+  ds.write(turnRight);
+  ds.write(fire);
+  ds.write(aimDirection);
 }
 
 }
