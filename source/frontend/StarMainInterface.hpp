@@ -152,6 +152,9 @@ private:
   void updateCursor();
   void renderCursor();
 
+  // Space combat input handling - sends pilot controls when in combat mode
+  void updateSpaceCombatInput();
+
   bool overButton(PolyI const& buttonPoly, Vec2F const& mousePos) const;
 
   bool overlayClick(Vec2F const& mousePos, MouseButton mouseButton);
