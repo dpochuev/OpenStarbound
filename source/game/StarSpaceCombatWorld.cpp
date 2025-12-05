@@ -9,6 +9,10 @@
 
 namespace Star {
 
+// Radius to scan for ship tiles when calculating characteristics
+// Ships are typically within +/- 100 tiles of center
+static constexpr int ShipTileScanRadius = 100;
+
 SpaceCombatWorld::SpaceCombatWorld(ClockConstPtr universeClock)
   : m_universeClock(std::move(universeClock)) {
   
@@ -340,10 +344,9 @@ Maybe<SpaceCombatWorld::ShipCharacteristics> SpaceCombatWorld::calculateShipChar
     float minX = 0, maxX = 0, minY = 0, maxY = 0;
     bool foundAnyTile = false;
     
-    // Scan a reasonable area for ship tiles (ships are usually within +/- 100 tiles of center)
-    int scanRadius = 100;
-    for (int x = -scanRadius; x <= scanRadius; ++x) {
-      for (int y = -scanRadius; y <= scanRadius; ++y) {
+    // Scan a reasonable area for ship tiles
+    for (int x = -ShipTileScanRadius; x <= ShipTileScanRadius; ++x) {
+      for (int y = -ShipTileScanRadius; y <= ShipTileScanRadius; ++y) {
         Vec2I pos(x, y);
         // Check if there's a foreground tile at this position
         auto tile = worldServer->getServerTile(pos);

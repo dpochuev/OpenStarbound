@@ -11,6 +11,7 @@ namespace Star {
 
 STAR_CLASS(Clock);
 STAR_CLASS(WorldServer);
+STAR_CLASS(WorldServerThread);
 STAR_STRUCT(Packet);
 
 // Server-side space combat arena where multiple ships coexist

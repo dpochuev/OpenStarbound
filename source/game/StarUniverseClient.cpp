@@ -711,6 +711,25 @@ bool UniverseClient::paused() const {
   return m_pause;
 }
 
+void UniverseClient::sendSpaceCombatInput(SpaceCombatInput const& input) {
+  if (!m_connection || !m_connection->isOpen())
+    return;
+  
+  if (!inSpaceCombat())
+    return;
+
+  auto packet = make_shared<SpaceCombatInputPacket>(
+    input.thrustForward,
+    input.thrustBackward,
+    input.turnLeft,
+    input.turnRight,
+    input.fire,
+    input.aimDirection
+  );
+  
+  m_connection->pushSingle(packet);
+}
+
 void UniverseClient::setPause(bool pause) {
   m_pause = pause;
 

@@ -1723,8 +1723,8 @@ void MainInterface::updateSpaceCombatInput() {
   // Update local client state
   m_client->spaceCombatClient()->setLocalInput(combatInput);
 
-  // Send input packet to server (the packet will be sent via the connection)
-  // Note: In a full implementation, this would be sent through the proper packet queue
+  // Send input packet to server
+  m_client->sendSpaceCombatInput(combatInput);
 }
 
 }

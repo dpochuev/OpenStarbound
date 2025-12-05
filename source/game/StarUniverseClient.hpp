@@ -10,6 +10,7 @@
 #include "StarSky.hpp"
 #include "StarUniverseConnection.hpp"
 #include "StarLuaComponents.hpp"
+#include "StarSpaceCombatTypes.hpp"
 
 namespace Star {
 
@@ -115,6 +116,7 @@ public:
   // Space Combat
   SpaceCombatClientPtr spaceCombatClient() const;
   bool inSpaceCombat() const;
+  void sendSpaceCombatInput(SpaceCombatInput const& input);
 
   bool paused() const;
 
