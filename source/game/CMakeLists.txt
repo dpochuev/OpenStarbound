@@ -132,6 +132,8 @@ SET (star_game_HEADERS
     StarStatSet.hpp
     StarStatusController.hpp
     StarStatusEffectDatabase.hpp
+    StarSpaceCombatTypes.hpp
+    StarSpaceCombatWorld.hpp
     StarStatusTypes.hpp
     StarStoredFunctions.hpp
     StarSystemWorld.hpp
@@ -399,6 +401,8 @@ SET (star_game_SOURCES
     StarStatSet.cpp
     StarStatusController.cpp
     StarStatusEffectDatabase.cpp
+    StarSpaceCombatTypes.cpp
+    StarSpaceCombatWorld.cpp
     StarStatusTypes.cpp
     StarStoredFunctions.cpp
     StarSystemWorld.cpp
