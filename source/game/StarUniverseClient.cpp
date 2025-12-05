@@ -814,7 +814,10 @@ void UniverseClient::handlePackets(List<PacketPtr> const& packets) {
         m_spaceCombatClient->spawnProjectile(proj);
       } else if (auto spaceCombatProjectileHit = as<SpaceCombatProjectileHitPacket>(packet)) {
         m_spaceCombatClient->removeProjectile(spaceCombatProjectileHit->projectileId);
-        // TODO: visual/audio feedback for hit
+        // Future: Add visual/audio feedback for projectile hit (particles, sound)
+        Logger::debug("SpaceCombat: Projectile {} hit ship at {}", 
+                      spaceCombatProjectileHit->projectileId, 
+                      spaceCombatProjectileHit->hitPosition);
       
       } else if (!m_systemWorldClient->handleIncomingPacket(packet)) {
         // see if the system world will handle it, otherwise pass it along to the world client

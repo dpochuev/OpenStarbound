@@ -600,6 +600,12 @@ void UniverseServer::run() {
       handleWorldMessages();
       shutdownInactiveWorlds();
       doTriggeredStorage();
+      
+      // Update Space Combat World (prototype feature)
+      if (m_spaceCombatWorld && m_spaceCombatWorld->isEnabled()) {
+        float dt = 1.0f / 60.0f;  // Approximate server tick rate
+        m_spaceCombatWorld->update(dt);
+      }
     } catch (std::exception const& e) {
       Logger::error("UniverseServer: exception caught: {}", outputException(e, true));
     }
