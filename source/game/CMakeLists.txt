@@ -132,6 +132,7 @@ SET (star_game_HEADERS
     StarStatSet.hpp
     StarStatusController.hpp
     StarStatusEffectDatabase.hpp
+    StarSpaceCombatClient.hpp
     StarSpaceCombatTypes.hpp
     StarSpaceCombatWorld.hpp
     StarStatusTypes.hpp
@@ -401,6 +402,7 @@ SET (star_game_SOURCES
     StarStatSet.cpp
     StarStatusController.cpp
     StarStatusEffectDatabase.cpp
+    StarSpaceCombatClient.cpp
     StarSpaceCombatTypes.cpp
     StarSpaceCombatWorld.cpp
     StarStatusTypes.cpp

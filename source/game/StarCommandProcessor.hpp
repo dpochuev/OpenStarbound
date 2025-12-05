@@ -60,6 +60,7 @@ private:
   String updatePlanetType(ConnectionId connectionId, String const& argumentString);
   String setWeather(ConnectionId connectionId, String const& argumentString);
   String setEnvironmentBiome(ConnectionId connectionId, String const& argumentString);
+  String spaceCombat(ConnectionId connectionId, String const& argumentString);
 
   mutable Mutex m_mutex;
 
