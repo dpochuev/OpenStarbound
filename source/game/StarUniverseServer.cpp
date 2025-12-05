@@ -19,6 +19,8 @@
 #include "StarUniverseServerLuaBindings.hpp"
 #include "StarVersioningDatabase.hpp"
 #include "StarWorldTemplate.hpp"
+#include "StarSpaceCombatWorld.hpp"
+#include "StarSpaceCombatTypes.hpp"
 
 namespace Star {
 
@@ -92,6 +94,9 @@ UniverseServer::UniverseServer(String const& storageDir)
     networkWorkerThreads);
 
   m_pause = make_shared<atomic<bool>>(false);
+
+  // Initialize Space Combat World (prototype feature)
+  m_spaceCombatWorld = make_shared<SpaceCombatWorld>(m_universeClock);
 }
 
 UniverseServer::~UniverseServer() {
@@ -1629,6 +1634,20 @@ void UniverseServer::packetsReceived(UniverseConnectionServer*, ConnectionId cli
       } else if (is<SystemObjectSpawnPacket>(packet)) {
         if (auto currentSystem = clientContext->systemWorld())
           currentSystem->pushIncomingPacket(clientId, std::move(packet));
+      
+      // Space Combat packets
+      } else if (auto spaceCombatInput = as<SpaceCombatInputPacket>(packet)) {
+        if (m_spaceCombatWorld && m_spaceCombatWorld->isEnabled()) {
+          SpaceCombatInput input;
+          input.thrustForward = spaceCombatInput->thrustForward;
+          input.thrustBackward = spaceCombatInput->thrustBackward;
+          input.turnLeft = spaceCombatInput->turnLeft;
+          input.turnRight = spaceCombatInput->turnRight;
+          input.fire = spaceCombatInput->fire;
+          input.aimDirection = spaceCombatInput->aimDirection;
+          m_spaceCombatWorld->setShipInput(clientId, input);
+        }
+
       } else {
         if (auto currentWorld = clientContext->playerWorld())
           currentWorld->pushIncomingPackets(clientId, {std::move(packet)});
